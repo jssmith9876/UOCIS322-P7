@@ -15,31 +15,25 @@
             integrity="sha384-+YQ4JLhjyBLPDQt//I+STsc9iw4uQqACwlvpslubQzn4u2UU2UFM80nGisd026JF"
             crossorigin="anonymous">
         </script>
+        <link rel="stylesheet" href="/static/css/web_style.css" />
     </head>
 
-    <style>
-        button {
-            width: 150px;
-            margin-bottom: 1px;
-        }
-
-        input {
-            width: 50px;
-        }
-
-        .flex_container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 10px;
-        }
-
-        .display_buttons {
-            flex-direction: column;
-        }
-    </style>
-
     <body>
+        <!-- Nav bar -->
+        <div class="nav"></div>
+            <ul>
+                <li><a href="/index">Home</a></li>
+                <li>
+                    {% if not current_user.is_authenticated %}
+                    <a href="/login">Login</a>
+                    {% else %}
+                    <a href="/logout">Logout</a>
+                    {% endif %}
+                </li>
+                <li><a href="/register">Register</a></li>
+            </ul>
+        </div>
+
         <div class="flex_container">
             <div class="flex_container display_buttons">
                 <button id="listAll">List All Times</button>
