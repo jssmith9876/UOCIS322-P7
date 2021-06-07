@@ -1,0 +1,24 @@
+<html>
+    <head>
+        <title>Your Results</title>
+    </head>
+    <body>
+        <div>
+            {% if items|length > 0 %}
+                {% for item in items %}
+                <div>
+                    <h2>Checkpoint {{ item.index }}</h2>
+                    <p>Miles: {{ item.miles }}</p>
+                    <p>Km: {{ item.km }}</p>
+                    <p>Open time: {{ item.open }} </p>
+                    <p>Close time: {{ item.close }}</p>
+                </div>
+                {% endfor %}
+            {% else %}
+                <h2>Error</h2>
+                <p>No checkpoints have been submitted!</p>
+            {% endif %}
+            <a href="/index">Click here to go back</a>
+        </div>
+    </body>
+</html>
