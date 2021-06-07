@@ -4,7 +4,7 @@ from flask_login import (LoginManager, current_user, login_required,
                         login_user, logout_user, UserMixin, 
                         confirm_login, fresh_login_required)
 from flask_wtf import FlaskForm as Form
-from wtforms import BooleanField, StringField, validators
+from wtforms import BooleanField, StringField, PasswordField, validators
 import requests
 import logging
 
@@ -16,6 +16,10 @@ class LoginForm(Form):
         validators.Length(min=2, max=25, 
                          message=u"Username must be between 2 and 25 characters!"),
         validators.InputRequired(u"Username is required")])
+    password = PasswordField('Password', [
+        validators.Length(min=2, max=25,
+                         message=u"Password must be between 2 and 25 characters!"),
+        validators.InputRequired(u"Password is required")])
     remember = BooleanField("Remember me")
 
 def is_safe_url(target):
@@ -27,13 +31,14 @@ def is_safe_url(target):
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
 class User(UserMixin):
-    def __init__(self, id, name):
+    def __init__(self, id, name, password):
         self.id = id
         self.name = name
+        self.password = password
 
 USERS = {
-    1: User(u"1", u"jordan"),
-    2: User(u"2", u"other")
+    1: User(u"1", u"jordan", u"password1"),
+    2: User(u"2", u"other", u"password2")
 }
 
 USER_NAMES = dict((u.name, u) for u in USERS.values())
@@ -72,21 +77,40 @@ def home():
 @app.route('/login', methods=["GET", "POST"])
 def login():
     form = LoginForm()
-    if form.validate_on_submit() and request.method == "POST" and "username" in request.form:
+    if (form.validate_on_submit() and request.method == "POST" and 
+        "username" in request.form and "password" in request.form):
         username = request.form["username"]
-        if username in USER_NAMES:
-            remember = request.form.get("remember", "false") == "true"
-            if login_user(USER_NAMES[username], remember=remember):
-                flash("Logged in!")
-                flash("I'll remember you") if remember else None
-                next = request.args.get("next")
-                if not is_safe_url(next):
-                    abort(400)
-                return redirect(next or url_for('home'))
-            else:
-                flash("Sorry, but you could not log in.")
+        password = request.form["password"]
+
+        for user in USERS.values():
+            app.logger.debug(user)
+            if username == user.name and password == user.password:
+                remember = request.form.get("remember", "false") == "true"
+                if login_user(USER_NAMES[username], remember=remember):
+                    flash("Logged in!")
+                    flash("I'll remember you") if remember else None
+                    next = request.args.get("next")
+                    if not is_safe_url(next):
+                        abort(400)
+                    return redirect(next or url_for('home'))
+                else:
+                    flash("Sorry, but you could not be logged in.")
         else:
-            flash(u"Invalid username.")
+            flash(u"Invalid username or password.")
+
+        # if username in USER_NAMES:
+        #     remember = request.form.get("remember", "false") == "true"
+        #     if login_user(USER_NAMES[username], remember=remember):
+        #         flash("Logged in!")
+        #         flash("I'll remember you") if remember else None
+        #         next = request.args.get("next")
+        #         if not is_safe_url(next):
+        #             abort(400)
+        #         return redirect(next or url_for('home'))
+        #     else:
+        #         flash("Sorry, but you could not be logged in.")
+        # else:
+        #     flash(u"Invalid username or password.")
     return render_template("login.html", form=form)
 
 @app.route('/logout')
