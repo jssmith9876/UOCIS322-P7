@@ -6,6 +6,7 @@ from flask_login import (LoginManager, current_user, login_required,
 from flask_wtf import FlaskForm as Form
 from wtforms import BooleanField, StringField, PasswordField, validators
 from pymongo import MongoClient
+from passlib.apps import custom_app_context as pwd_context
 import requests
 import logging
 import os
@@ -46,6 +47,8 @@ class RegistrationForm(Form):
     ])
     confirm = PasswordField('Repeat Password')
 
+
+# Helper Functions
 def is_safe_url(target):
     """
     :source: https://github.com/fengsp/flask-snippets/blob/master/security/redirect_back.py
@@ -54,18 +57,25 @@ def is_safe_url(target):
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+def hash_password(password):
+    return pwd_context.encrypt(password)
+
+def verify_password(password, hashVal):
+    return pwd_context.verify(password, hashVal)
+
+
 class User(UserMixin):
     def __init__(self, id, name, password):
         self.id = id
         self.name = name
         self.password = password
 
-USERS = {
-    1: User(u"1", u"jordan", u"password1"),
-    2: User(u"2", u"other", u"password2")
-}
+# USERS = {
+#     1: User(u"1", u"jordan", u"password1"),
+#     2: User(u"2", u"other", u"password2")
+# }
 
-USER_NAMES = dict((u.name, u) for u in USERS.values())
+# USER_NAMES = dict((u.name, u) for u in USERS.values())
 
 app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
@@ -84,7 +94,11 @@ login_manager.needs_refresh_message_category = "info"
 
 @login_manager.user_loader
 def load_user(user_id):
-    return USERS[int(user_id)]
+    for user in list(db.userdb.find()):
+        if (user['id'] == str(user_id)):
+            current_user = User(int(user['id']), user['username'], user['password'])
+            break
+    return current_user
 
 login_manager.init_app(app)
 
@@ -105,10 +119,11 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        for user in USERS.values():
-            if username == user.name and password == user.password:
+        for user in list(db.userdb.find()):
+            if username == user["username"] and verify_password(password, user["password"]):
                 remember = request.form.get("remember", "false") == "true"
-                if login_user(USER_NAMES[username], remember=remember):
+                new_user = User(user["id"], user["username"], user["password"])
+                if (login_user(new_user, remember=remember)):
                     flash("Logged in!")
                     flash("I'll remember you") if remember else None
                     next = request.args.get("next")
@@ -140,7 +155,7 @@ def register():
         new_user = {
             "id": str(NUM_REGISTERED),
             "username": request.form["username"],
-            "password": request.form["password"]
+            "password": hash_password(request.form["password"])
         }
 
         # Make sure the username is not already in use

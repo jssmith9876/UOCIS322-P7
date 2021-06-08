@@ -4,3 +4,5 @@ wtforms==2.3.3
 Flask-WTF==0.15.1
 requests
 pymongo
+itsdangerous==2.0
+passlib==1.7.1
