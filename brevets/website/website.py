@@ -70,13 +70,6 @@ class User(UserMixin):
         self.name = name
         self.password = password
 
-# USERS = {
-#     1: User(u"1", u"jordan", u"password1"),
-#     2: User(u"2", u"other", u"password2")
-# }
-
-# USER_NAMES = dict((u.name, u) for u in USERS.values())
-
 app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
 
