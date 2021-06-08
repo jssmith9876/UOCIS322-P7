@@ -5,8 +5,16 @@ from flask_login import (LoginManager, current_user, login_required,
                         confirm_login, fresh_login_required)
 from flask_wtf import FlaskForm as Form
 from wtforms import BooleanField, StringField, PasswordField, validators
+from pymongo import MongoClient
 import requests
 import logging
+import os
+
+"""
+Database stuff
+"""
+client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
+db = client.brevetdb
 
 """
 Login stuff
@@ -63,7 +71,6 @@ app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
 
 app.config.from_object(__name__)
-
 
 login_manager = LoginManager()
 login_manager.session_protection = "strong"
@@ -122,25 +129,34 @@ def logout():
     flash("Logged out.")
     return redirect(url_for("home"))
 
+
+NUM_REGISTERED = 0
+
 @app.route('/register', methods=["GET", "POST"])
 def register():
     form = RegistrationForm()
     if (form.validate_on_submit() and request.method == "POST"):
-        username = request.form["username"]
+        global NUM_REGISTERED
+        new_user = {
+            "id": str(NUM_REGISTERED),
+            "username": request.form["username"],
+            "password": request.form["password"]
+        }
 
-        # Make sure the username has not already been chosen
-        for user in USERS.values():
-            if username == user.name:
+        # Make sure the username is not already in use
+        for user in list(db.userdb.find()):
+            if user["username"] == new_user["username"]:
                 flash("Sorry, that username is already in use!")
-                return render_template('register.html', form=form)
+                return redirect(url_for('register'))
         else:
-            flash("You have been registered!")
-            if login_user(USER_NAMES[username], remember="false"):
-                next = request.args.get("next")
-                if not is_safe_url(next):
-                    abort(400)
-                return redirect(next or url_for('home'))
-
+            try:
+                db.userdb.insert_one(new_user)
+                flash("You have been registered!")
+                NUM_REGISTERED += 1
+            except Exception as e:
+                flash("Sorry, but you could not be registered.")
+                return redirect(url_for('register'))
+        
     return render_template('register.html', form=form)
 
 @app.route('/_get_data')
