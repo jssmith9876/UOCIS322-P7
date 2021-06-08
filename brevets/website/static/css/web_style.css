@@ -53,24 +53,30 @@ input {
 form .col-4 {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    width: 250px;
+    width: fit-content;
 }
 
 .form-group {
     display: flex;
-    justify-content: space-around;
-    width: 200px;
+    justify-content: space-between;
+    min-width: 200px;
     padding: 5px 10px;
 }
 
 .form-group input {
+    margin-left: 10px;
     width: 100px;
 }
 
+.input-group,
 .form-check {
-    margin-bottom: 15px;
+    align-self:center;
 }
+
+.input-group {
+    margin-top: 10px;
+}
+
 .form-check input {
     width: 15px;
 }

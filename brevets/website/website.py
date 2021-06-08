@@ -15,12 +15,28 @@ class LoginForm(Form):
     username = StringField('Username', [
         validators.Length(min=2, max=25, 
                          message=u"Username must be between 2 and 25 characters!"),
-        validators.InputRequired(u"Username is required")])
+        validators.InputRequired(u"Username is required")
+    ])
     password = PasswordField('Password', [
         validators.Length(min=2, max=25,
                          message=u"Password must be between 2 and 25 characters!"),
-        validators.InputRequired(u"Password is required")])
+        validators.InputRequired(u"Password is required")
+    ])
     remember = BooleanField("Remember me")
+
+class RegistrationForm(Form):
+    username = StringField('Username', [
+        validators.Length(min=2, max=25, 
+                         message=u"Username must be between 2 and 25 characters!"),
+        validators.InputRequired(u"Username is required")
+    ])
+    password = PasswordField('Password', [
+        validators.Length(min=2, max=25,
+                         message=u"Password must be between 2 and 25 characters!"),
+        validators.InputRequired(u"Password is required"),
+        validators.EqualTo('confirm', message='Passwords must match')
+    ])
+    confirm = PasswordField('Repeat Password')
 
 def is_safe_url(target):
     """
@@ -83,7 +99,6 @@ def login():
         password = request.form["password"]
 
         for user in USERS.values():
-            app.logger.debug(user)
             if username == user.name and password == user.password:
                 remember = request.form.get("remember", "false") == "true"
                 if login_user(USER_NAMES[username], remember=remember):
@@ -98,19 +113,6 @@ def login():
         else:
             flash(u"Invalid username or password.")
 
-        # if username in USER_NAMES:
-        #     remember = request.form.get("remember", "false") == "true"
-        #     if login_user(USER_NAMES[username], remember=remember):
-        #         flash("Logged in!")
-        #         flash("I'll remember you") if remember else None
-        #         next = request.args.get("next")
-        #         if not is_safe_url(next):
-        #             abort(400)
-        #         return redirect(next or url_for('home'))
-        #     else:
-        #         flash("Sorry, but you could not be logged in.")
-        # else:
-        #     flash(u"Invalid username or password.")
     return render_template("login.html", form=form)
 
 @app.route('/logout')
@@ -120,9 +122,26 @@ def logout():
     flash("Logged out.")
     return redirect(url_for("home"))
 
-@app.route('/register')
+@app.route('/register', methods=["GET", "POST"])
 def register():
-    return render_template('register.html')
+    form = RegistrationForm()
+    if (form.validate_on_submit() and request.method == "POST"):
+        username = request.form["username"]
+
+        # Make sure the username has not already been chosen
+        for user in USERS.values():
+            if username == user.name:
+                flash("Sorry, that username is already in use!")
+                return render_template('register.html', form=form)
+        else:
+            flash("You have been registered!")
+            if login_user(USER_NAMES[username], remember="false"):
+                next = request.args.get("next")
+                if not is_safe_url(next):
+                    abort(400)
+                return redirect(next or url_for('home'))
+
+    return render_template('register.html', form=form)
 
 @app.route('/_get_data')
 def _get_data():
