@@ -3,6 +3,10 @@ from flask import Flask, jsonify, Response, request
 from flask_restful import Resource, Api, reqparse
 import logging
 from pymongo import MongoClient
+from passlib.apps import custom_app_context as pwd_context
+from itsdangerous import (TimedJSONWebSignatureSerializer \
+                                  as Serializer, BadSignature, \
+                                  SignatureExpired)
 import os
 
 app = Flask(__name__)
@@ -83,6 +87,13 @@ class listCloseOnly(Resource):
         k = request.args.get('k')
         return get_API_results(['close'], file_type, k)
 
+# For logging in and registering
+def hash_password(password):
+    return pwd_context.encrypt(password)
+
+def verify_password(password, hashVal):
+    return pwd_context.verify(password, hashVal)
+
 class register(Resource):
     def post(self):
         new_user = parser.parse_args()
@@ -93,12 +104,31 @@ class register(Resource):
                 return Response("Sorry, that username is already in use!", status=400)
         else:
             try:
+                #new_user["password"] = hash_password(new_user["password"])
                 db.userdb.insert_one(new_user)
                 return Response("You have been registered!", status=201)
             except Exception as e:
                 return Response("Sorry, but you could not be registered.", status=400)
 
         # app.logger.debug(args)
+
+SECRET_KEY = 'test1234@#$'
+
+def generate_auth_token(expiration=600):
+   s = Serializer(SECRET_KEY, expires_in=expiration)
+   return s.dumps({'id': 5, 'name': 'Ryan'})
+
+class token(Resource):
+    def get(self):
+        credentials = parser.parse_args()
+
+        for user in list(db.userdb.find()):
+            if credentials["username"] == user["username"] and verify_password(credentials["password"], user["password"]):
+                token = generate_auth_token()
+                return ({'message': 'Great Success', 'token': str(token), 'duration': 600, 'id': user['id']}, 200)
+        else:
+            return Response("Invalid username or password.", status=401)
+                
 
 
 # List of resources
@@ -109,6 +139,8 @@ api.add_resource(listCloseOnly, '/listCloseOnly', '/listCloseOnly/<string:file_t
 
 # Login/Registration resources
 api.add_resource(register, '/register')
+api.add_resource(token, '/token')
+
 
 
 if app.debug:

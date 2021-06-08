@@ -1,5 +1,6 @@
 from urllib.parse import urlparse, urljoin
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from werkzeug.wrappers import response
 from flask_login import (LoginManager, current_user, login_required,
                         login_user, logout_user, UserMixin, 
                         confirm_login, fresh_login_required)
@@ -9,6 +10,7 @@ from pymongo import MongoClient
 from passlib.apps import custom_app_context as pwd_context
 import requests
 import logging
+import json
 import os
 
 """
@@ -60,15 +62,12 @@ def is_safe_url(target):
 def hash_password(password):
     return pwd_context.encrypt(password)
 
-def verify_password(password, hashVal):
-    return pwd_context.verify(password, hashVal)
-
 
 class User(UserMixin):
-    def __init__(self, id, name, password):
+    def __init__(self, id, name, token):
         self.id = id
         self.name = name
-        self.password = password
+        self.token = token
 
 app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
@@ -109,23 +108,44 @@ def login():
     if (form.validate_on_submit() and request.method == "POST" and 
         "username" in request.form and "password" in request.form):
         username = request.form["username"]
+        #password = hash_password(request.form["password"])
         password = request.form["password"]
 
-        for user in list(db.userdb.find()):
-            if username == user["username"] and verify_password(password, user["password"]):
-                remember = request.form.get("remember", "false") == "true"
-                new_user = User(user["id"], user["username"], user["password"])
-                if (login_user(new_user, remember=remember)):
-                    flash("Logged in!")
-                    flash("I'll remember you") if remember else None
-                    next = request.args.get("next")
-                    if not is_safe_url(next):
-                        abort(400)
-                    return redirect(next or url_for('home'))
-                else:
-                    flash("Sorry, but you could not be logged in.")
+        r = requests.get("http://restapi:5000/token", params={'username': username, 'password': password})
+
+        # app.logger.debug(json.loads(r.text))
+        if (r.status_code == 200):
+            #flash(json.loads(r.text)['message'])
+            response_content = json.loads(r.text)
+            remember = request.form.get("remember", "false") == "true"
+            new_user = User(response_content['id'], username, response_content['token'])
+            if (login_user(new_user, remember=remember)):
+                flash("Logged in!")
+                flash("I'll remember you") if remember else None
+                next = request.args.get("next")
+                if not is_safe_url(next):
+                    abort(400)
+                return redirect(next or url_for('home'))
+        elif (r.status_code == 401):
+            flash(r.text)
         else:
-            flash(u"Invalid username or password.")
+            flash("Something went wrong.")
+        
+        # for user in list(db.userdb.find()):
+        #     if username == user["username"] and verify_password(password, user["password"]):
+        #         remember = request.form.get("remember", "false") == "true"
+        #         new_user = User(user["id"], user["username"], user["password"])
+        #         if (login_user(new_user, remember=remember)):
+        #             flash("Logged in!")
+        #             flash("I'll remember you") if remember else None
+        #             next = request.args.get("next")
+        #             if not is_safe_url(next):
+        #                 abort(400)
+        #             return redirect(next or url_for('home'))
+        #         else:
+        #             flash("Sorry, but you could not be logged in.")
+        # else:
+        #     flash(u"Invalid username or password.")
 
     return render_template("login.html", form=form)
 
@@ -147,8 +167,10 @@ def register():
         new_user = {
             "id": str(NUM_REGISTERED),
             "username": request.form["username"],
-            "password": hash_password(request.form["password"])
+            "password": request.form["password"]
         }
+
+        new_user["password"] = hash_password(new_user["password"])
 
         # Send the user to the API
         r = requests.post("http://restapi:5000/register", data=new_user)
