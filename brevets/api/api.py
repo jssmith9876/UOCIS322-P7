@@ -1,11 +1,19 @@
+from urllib import parse
 from flask import Flask, jsonify, Response, request
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, reqparse
 import logging
 from pymongo import MongoClient
 import os
 
 app = Flask(__name__)
 api = Api(app)
+
+# Request parser
+parser = reqparse.RequestParser()
+parser.add_argument('id')
+parser.add_argument('username')
+parser.add_argument('password')
+
 
 # Stuff for database interaction
 client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
@@ -75,10 +83,32 @@ class listCloseOnly(Resource):
         k = request.args.get('k')
         return get_API_results(['close'], file_type, k)
 
+class register(Resource):
+    def post(self):
+        new_user = parser.parse_args()
+
+        # Check if the username already exists
+        for user in list(db.userdb.find()):
+            if (user["username"] == new_user["username"]):
+                return Response("Sorry, that username is already in use!", status=400)
+        else:
+            try:
+                db.userdb.insert_one(new_user)
+                return Response("You have been registered!", status=201)
+            except Exception as e:
+                return Response("Sorry, but you could not be registered.", status=400)
+
+        # app.logger.debug(args)
+
+
 # List of resources
+# List info resources
 api.add_resource(listAll, '/listAll', '/listAll/<string:file_type>')
 api.add_resource(listOpenOnly, '/listOpenOnly', '/listOpenOnly/<string:file_type>')
 api.add_resource(listCloseOnly, '/listCloseOnly', '/listCloseOnly/<string:file_type>')
+
+# Login/Registration resources
+api.add_resource(register, '/register')
 
 
 if app.debug:

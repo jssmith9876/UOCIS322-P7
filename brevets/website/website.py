@@ -100,7 +100,6 @@ Routes
 """
 @app.route('/')
 @app.route('/index')
-@login_required
 def home():
     return render_template('index.html')
 
@@ -151,19 +150,13 @@ def register():
             "password": hash_password(request.form["password"])
         }
 
-        # Make sure the username is not already in use
-        for user in list(db.userdb.find()):
-            if user["username"] == new_user["username"]:
-                flash("Sorry, that username is already in use!")
-                return redirect(url_for('register'))
-        else:
-            try:
-                db.userdb.insert_one(new_user)
-                flash("You have been registered!")
-                NUM_REGISTERED += 1
-            except Exception as e:
-                flash("Sorry, but you could not be registered.")
-                return redirect(url_for('register'))
+        # Send the user to the API
+        r = requests.post("http://restapi:5000/register", data=new_user)
+
+        # Get the response, and act accordingly
+        flash(r.text)
+        if (r.text == "You have been registered!"):
+            NUM_REGISTERED += 1
         
     return render_template('register.html', form=form)
 
