@@ -137,7 +137,7 @@ class register(Resource):
 
         # app.logger.debug(args)
 
-def generate_auth_token(username, expiration=5):
+def generate_auth_token(username, expiration=600):
    s = Serializer(SECRET_KEY, expires_in=expiration)
    return s.dumps({'name': username})
 
