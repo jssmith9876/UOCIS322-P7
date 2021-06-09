@@ -32,8 +32,5 @@ services:
             - "5002:5000"
         depends_on:
             - restapi
-            - ourdb
-        environment:
-            MONGODB_HOSTNAME: ourdb
     ourdb:
         image: mongo:latest

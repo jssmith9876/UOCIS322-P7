@@ -1,24 +1,14 @@
 from urllib.parse import urlparse, urljoin
-from flask import Flask, render_template, request, redirect, url_for, flash, abort
-from flask.json import jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, abort, session
 from werkzeug.wrappers import response
 from flask_login import (LoginManager, current_user, login_required,
-                        login_user, logout_user, UserMixin, 
-                        confirm_login, fresh_login_required)
+                        login_user, logout_user, UserMixin)
 from flask_wtf import FlaskForm as Form
 from wtforms import BooleanField, StringField, PasswordField, validators
-from pymongo import MongoClient
 from passlib.apps import custom_app_context as pwd_context
 import requests
 import logging
 import json
-import os
-
-"""
-Database stuff
-"""
-client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
-db = client.brevetdb
 
 """
 Login stuff
@@ -69,10 +59,6 @@ class User(UserMixin):
         self.name = name
         self.token = token
 
-    # Override the get_id function to keep the user's token
-    def get_id(self):
-        return [self.id, self.token]
-
 app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
 
@@ -90,12 +76,10 @@ login_manager.needs_refresh_message_category = "info"
 
 @login_manager.user_loader
 def load_user(user_id):
-    current_id = user_id[0]
-    current_token = user_id[1]
 
-    found_users = list(db.userdb.find( { 'id': current_id } ))
-    if (len(found_users) > 0):
-        return User(current_id, found_users[0]["username"], current_token)
+    # Make sure a username/token are already in the session
+    if ("username" in session.keys() and "token" in session.keys()):
+        return User(user_id, session["username"], session["token"])
     else:
         return None
 
@@ -110,6 +94,16 @@ Routes
 def home():
     return render_template('index.html')
 
+def resolve_login(response_content, username, remember):
+    new_user = User(response_content['id'], username, response_content['token'])
+    
+    if (login_user(new_user, remember=remember)):
+        session["username"] = username
+        session["token"] = response_content["token"]
+        return True
+    else:
+        return False
+
 @app.route('/login', methods=["GET", "POST"])
 def login():
     form = LoginForm()
@@ -121,21 +115,21 @@ def login():
         r = requests.get("http://restapi:5000/token", params={'username': username, 'password': password})
 
         if (r.status_code == 200):
-            response_content = json.loads(r.text)
             remember = request.form.get("remember", "false") == "true"
-            new_user = User(response_content['id'], username, response_content['token'])
-            if (login_user(new_user, remember=remember)):
+            login_result = resolve_login(json.loads(r.text), username, remember)
+            if (login_result):
                 flash("Logged in!")
                 flash("I'll remember you") if remember else None
                 next = request.args.get("next")
                 if not is_safe_url(next):
                     abort(400)
                 return redirect(next or url_for('home'))
+            else:
+                flash("Sorry, you could not be logged in.")
         elif (r.status_code == 401):
             flash(r.text)
         else:
-            flash("Something went wrong.")
-    
+            flash("Something went wrong.")    
 
     return render_template("login.html", form=form)
 
@@ -163,11 +157,28 @@ def register():
         new_user["password"] = hash_password(new_user["password"])
 
         # Send the user to the API
-        r = requests.post("http://restapi:5000/register", data=new_user)
+        reg_resp = requests.post("http://restapi:5000/register", data=new_user)
 
         # Get the response, and act accordingly
-        flash(r.text)
-        if (r.text == "You have been registered!"):
+        flash(reg_resp.text)
+        if (reg_resp.status_code == 201):
+            # Try to log the newly registered user in
+            log_resp = requests.get("http://restapi:5000/token", params={'username': new_user["username"], 'password': request.form["password"]})
+            if (log_resp.status_code == 200):
+                login_result = resolve_login(json.loads(log_resp.text), new_user["username"], False)
+                if (login_result):
+                    flash("Logged in!")
+                    next = request.args.get("next")
+                    if not is_safe_url(next):
+                        abort(400)
+                    return redirect(next or url_for('home'))
+                else:
+                    flash("Sorry, you could not be logged in.")
+            elif (log_resp.status_code == 401):
+                flash(log_resp.text)
+            else:
+                flash("Something went wrong.")
+            
             NUM_REGISTERED += 1
         
     return render_template('register.html', form=form)
