@@ -7,6 +7,7 @@ from passlib.apps import custom_app_context as pwd_context
 from itsdangerous import (TimedJSONWebSignatureSerializer \
                                   as Serializer, BadSignature, \
                                   SignatureExpired)
+import json
 import os
 
 app = Flask(__name__)
@@ -78,25 +79,40 @@ def verify_auth_token(token):
         return "Expired token!"    # valid token, but expired
     except BadSignature:
         return "Invalid token!"    # invalid token
-    return f"Success! Welcome {data['username']}."
+    return True
 
 # Returns a list of all open and close times
 class listAll(Resource):
     def get(self, file_type='json'):
         k = request.args.get('k')
-        return get_API_results(['open', 'close'], file_type, k)
+        token = request.args.get('token')
+        is_auth = verify_auth_token(token)
+        if (is_auth == True):
+            return get_API_results(['open', 'close'], file_type, k)
+        else:
+            return Response(is_auth, status=401)
 
 # Returns a list of all open times
 class listOpenOnly(Resource):
     def get(self, file_type='json'):
         k = request.args.get('k')
-        return get_API_results(['open'], file_type, k)
+        token = request.args.get('token')
+        is_auth = verify_auth_token(token)
+        if (is_auth == True):
+            return get_API_results(['open'], file_type, k)
+        else:
+            return Response(is_auth, status=401)
 
 # Returns a list of all close times
 class listCloseOnly(Resource):
     def get(self, file_type='json'):
         k = request.args.get('k')
-        return get_API_results(['close'], file_type, k)
+        token = request.args.get('token')
+        is_auth = verify_auth_token(token)
+        if (is_auth == True):
+            return get_API_results(['close'], file_type, k)
+        else:
+            return Response(is_auth, status=401)
 
 # For logging in and registering
 def hash_password(password):
@@ -134,7 +150,7 @@ class token(Resource):
         for user in list(db.userdb.find()):
             if credentials["username"] == user["username"] and verify_password(credentials["password"], user["password"]):
                 token = generate_auth_token()
-                return ({'token': str(token), 'duration': 600, 'id': user['id']}, 200)
+                return ({'token': token.decode('utf-8'), 'duration': 600, 'id': user['id']}, 200)
         else:
             return Response("Invalid username or password.", status=401)
                 

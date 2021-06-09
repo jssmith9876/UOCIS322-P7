@@ -1,5 +1,6 @@
 from urllib.parse import urlparse, urljoin
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
+from flask.json import jsonify
 from werkzeug.wrappers import response
 from flask_login import (LoginManager, current_user, login_required,
                         login_user, logout_user, UserMixin, 
@@ -61,7 +62,6 @@ def is_safe_url(target):
 
 def hash_password(password):
     return pwd_context.encrypt(password)
-
 
 class User(UserMixin):
     def __init__(self, id, name, token):
@@ -179,8 +179,13 @@ def _get_data():
     k = request.args.get('k')
     
     # Get the correct api based on the arguments given
-    url = "http://restapi:5000/" + ret_type + "/" + file_type + "?k=" + k
+    app.logger.debug(f"Current token: {current_user.token}")
+    url = "http://restapi:5000/" + ret_type + "/" + file_type + "?k=" + k + "&token=" + current_user.token
     r = requests.get(url)
+
+    if (r.status_code == 401):
+        abort(401)
+
     return r.text
     
 

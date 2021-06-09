@@ -24,8 +24,8 @@
     function getData(ret_type) {
         var file_type = $("#display_format").val();
         var k = $("#top_results").val();
-        $.get("/_get_data", {ret_type: ret_type, file_type: file_type, k: k}).done(
-            function(data) {
+        $.get("/_get_data", {ret_type: ret_type, file_type: file_type, k: k})
+        .done(function(data) {
                 // Clear the text area
                 $("#results").text("");
 
@@ -43,7 +43,7 @@
                     }
                 }
                 // Otherwise, the file type is csv
-                else {
+                else if (file_type === 'csv') {
                     // For each line (broken up by '\n'), add a new line to result field
                     var line = "";
                     for (var i = 0; i < data.length; i++) {
@@ -55,7 +55,11 @@
                     } 
                 }
             }
-        );
+        )
+        .fail(function( response ) {
+            console.log(response)
+            $("#results").text("Error: Unauthorized token. Please log back in.");
+        });
     }
 
     // List all button
