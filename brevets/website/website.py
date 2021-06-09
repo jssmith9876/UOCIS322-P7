@@ -1,11 +1,10 @@
 from urllib.parse import urlparse, urljoin
 from flask import Flask, render_template, request, redirect, url_for, flash, abort, session
-from werkzeug.wrappers import response
 from flask_login import (LoginManager, current_user, login_required,
                         login_user, logout_user, UserMixin)
 from flask_wtf import FlaskForm as Form
 from wtforms import BooleanField, StringField, PasswordField, validators
-from passlib.apps import custom_app_context as pwd_context
+from passlib.hash import sha256_crypt as hash_method
 import requests
 import logging
 import json
@@ -50,8 +49,11 @@ def is_safe_url(target):
     test_url = urlparse(urljoin(request.host_url, target))
     return test_url.scheme in ('http', 'https') and ref_url.netloc == test_url.netloc
 
+
+# Hashing method
+SECRET_KEY = 'test1234'
 def hash_password(password):
-    return pwd_context.encrypt(password)
+    return hash_method.using(salt=SECRET_KEY).encrypt(password)
 
 class User(UserMixin):
     def __init__(self, id, name, token):
@@ -76,7 +78,6 @@ login_manager.needs_refresh_message_category = "info"
 
 @login_manager.user_loader
 def load_user(user_id):
-
     # Make sure a username/token are already in the session
     if ("username" in session.keys() and "token" in session.keys()):
         return User(user_id, session["username"], session["token"])
@@ -96,8 +97,8 @@ def home():
 
 def resolve_login(response_content, username, remember):
     new_user = User(response_content['id'], username, response_content['token'])
-    
     if (login_user(new_user, remember=remember)):
+        # Store the user information in the session
         session["username"] = username
         session["token"] = response_content["token"]
         return True
@@ -112,7 +113,7 @@ def login():
         username = request.form["username"]
         password = request.form["password"]
 
-        r = requests.get("http://restapi:5000/token", params={'username': username, 'password': password})
+        r = requests.get("http://restapi:5000/token", params={'username': username, 'password': hash_password(password)})
 
         if (r.status_code == 200):
             remember = request.form.get("remember", "false") == "true"
@@ -140,7 +141,7 @@ def logout():
     flash("Logged out.")
     return redirect(url_for("home"))
 
-
+# To count the number 
 NUM_REGISTERED = 0
 
 @app.route('/register', methods=["GET", "POST"])
@@ -163,7 +164,7 @@ def register():
         flash(reg_resp.text)
         if (reg_resp.status_code == 201):
             # Try to log the newly registered user in
-            log_resp = requests.get("http://restapi:5000/token", params={'username': new_user["username"], 'password': request.form["password"]})
+            log_resp = requests.get("http://restapi:5000/token", params={'username': new_user["username"], 'password': new_user["password"]})
             if (log_resp.status_code == 200):
                 login_result = resolve_login(json.loads(log_resp.text), new_user["username"], False)
                 if (login_result):

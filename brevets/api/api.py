@@ -1,13 +1,11 @@
-from urllib import parse
 from flask import Flask, jsonify, Response, request
 from flask_restful import Resource, Api, reqparse
 import logging
 from pymongo import MongoClient
-from passlib.apps import custom_app_context as pwd_context
+from passlib.hash import sha256_crypt as hash_method
 from itsdangerous import (TimedJSONWebSignatureSerializer \
                                   as Serializer, BadSignature, \
                                   SignatureExpired)
-import json
 import os
 
 app = Flask(__name__)
@@ -19,7 +17,7 @@ parser.add_argument('id')
 parser.add_argument('username')
 parser.add_argument('password')
 
-SECRET_KEY = 'test1234@#$'
+SECRET_KEY = 'test1234'
 
 # Stuff for database interaction
 client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
@@ -116,10 +114,10 @@ class listCloseOnly(Resource):
 
 # For logging in and registering
 def hash_password(password):
-    return pwd_context.encrypt(password)
+    return hash_method.using(salt=SECRET_KEY).encrypt(password)
 
 def verify_password(password, hashVal):
-    return pwd_context.verify(password, hashVal)
+    return hash_method.verify(password, hashVal)
 
 class register(Resource):
     def post(self):
@@ -131,7 +129,7 @@ class register(Resource):
                 return Response("Sorry, that username is already in use!", status=400)
         else:
             try:
-                #new_user["password"] = hash_password(new_user["password"])
+                new_user["password"] = hash_password(new_user["password"])
                 db.userdb.insert_one(new_user)
                 return Response("You have been registered!", status=201)
             except Exception as e:
@@ -139,9 +137,9 @@ class register(Resource):
 
         # app.logger.debug(args)
 
-def generate_auth_token(expiration=600):
+def generate_auth_token(username, expiration=5):
    s = Serializer(SECRET_KEY, expires_in=expiration)
-   return s.dumps({'id': 5, 'name': 'Ryan'})
+   return s.dumps({'name': username})
 
 class token(Resource):
     def get(self):
@@ -149,7 +147,7 @@ class token(Resource):
 
         for user in list(db.userdb.find()):
             if credentials["username"] == user["username"] and verify_password(credentials["password"], user["password"]):
-                token = generate_auth_token()
+                token = generate_auth_token(user['username'])
                 return ({'token': token.decode('utf-8'), 'duration': 600, 'id': user['id']}, 200)
         else:
             return Response("Invalid username or password.", status=401)
