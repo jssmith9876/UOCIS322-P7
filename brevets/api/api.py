@@ -125,7 +125,7 @@ class token(Resource):
         for user in list(db.userdb.find()):
             if credentials["username"] == user["username"] and verify_password(credentials["password"], user["password"]):
                 token = generate_auth_token()
-                return ({'message': 'Great Success', 'token': str(token), 'duration': 600, 'id': user['id']}, 200)
+                return ({'token': str(token), 'duration': 600, 'id': user['id']}, 200)
         else:
             return Response("Invalid username or password.", status=401)
                 

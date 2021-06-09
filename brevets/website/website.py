@@ -108,14 +108,11 @@ def login():
     if (form.validate_on_submit() and request.method == "POST" and 
         "username" in request.form and "password" in request.form):
         username = request.form["username"]
-        #password = hash_password(request.form["password"])
         password = request.form["password"]
 
         r = requests.get("http://restapi:5000/token", params={'username': username, 'password': password})
 
-        # app.logger.debug(json.loads(r.text))
         if (r.status_code == 200):
-            #flash(json.loads(r.text)['message'])
             response_content = json.loads(r.text)
             remember = request.form.get("remember", "false") == "true"
             new_user = User(response_content['id'], username, response_content['token'])
@@ -130,22 +127,7 @@ def login():
             flash(r.text)
         else:
             flash("Something went wrong.")
-        
-        # for user in list(db.userdb.find()):
-        #     if username == user["username"] and verify_password(password, user["password"]):
-        #         remember = request.form.get("remember", "false") == "true"
-        #         new_user = User(user["id"], user["username"], user["password"])
-        #         if (login_user(new_user, remember=remember)):
-        #             flash("Logged in!")
-        #             flash("I'll remember you") if remember else None
-        #             next = request.args.get("next")
-        #             if not is_safe_url(next):
-        #                 abort(400)
-        #             return redirect(next or url_for('home'))
-        #         else:
-        #             flash("Sorry, but you could not be logged in.")
-        # else:
-        #     flash(u"Invalid username or password.")
+    
 
     return render_template("login.html", form=form)
 
