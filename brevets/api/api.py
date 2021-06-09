@@ -18,6 +18,7 @@ parser.add_argument('id')
 parser.add_argument('username')
 parser.add_argument('password')
 
+SECRET_KEY = 'test1234@#$'
 
 # Stuff for database interaction
 client = MongoClient('mongodb://' + os.environ['MONGODB_HOSTNAME'], 27017)
@@ -69,6 +70,16 @@ def get_API_results(desired_keys, return_type, k):
         # Return the response as plain text (for '\n' to work)
         return Response(csv_str, mimetype='text/plain')
 
+def verify_auth_token(token):
+    s = Serializer(SECRET_KEY)
+    try:
+        data = s.loads(token)
+    except SignatureExpired:
+        return "Expired token!"    # valid token, but expired
+    except BadSignature:
+        return "Invalid token!"    # invalid token
+    return f"Success! Welcome {data['username']}."
+
 # Returns a list of all open and close times
 class listAll(Resource):
     def get(self, file_type='json'):
@@ -111,8 +122,6 @@ class register(Resource):
                 return Response("Sorry, but you could not be registered.", status=400)
 
         # app.logger.debug(args)
-
-SECRET_KEY = 'test1234@#$'
 
 def generate_auth_token(expiration=600):
    s = Serializer(SECRET_KEY, expires_in=expiration)

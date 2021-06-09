@@ -69,6 +69,10 @@ class User(UserMixin):
         self.name = name
         self.token = token
 
+    # Override the get_id function to keep the user's token
+    def get_id(self):
+        return [self.id, self.token]
+
 app = Flask(__name__)
 app.secret_key = "and the cats in the cradle and the silver spoon"
 
@@ -86,11 +90,14 @@ login_manager.needs_refresh_message_category = "info"
 
 @login_manager.user_loader
 def load_user(user_id):
-    for user in list(db.userdb.find()):
-        if (user['id'] == str(user_id)):
-            current_user = User(int(user['id']), user['username'], user['password'])
-            break
-    return current_user
+    current_id = user_id[0]
+    current_token = user_id[1]
+
+    found_users = list(db.userdb.find( { 'id': current_id } ))
+    if (len(found_users) > 0):
+        return User(current_id, found_users[0]["username"], current_token)
+    else:
+        return None
 
 login_manager.init_app(app)
 
@@ -99,6 +106,7 @@ Routes
 """
 @app.route('/')
 @app.route('/index')
+@login_required
 def home():
     return render_template('index.html')
 
